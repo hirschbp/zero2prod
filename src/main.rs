@@ -2,7 +2,7 @@ use gethostname::gethostname;
 use mdns_sd::{Error, ServiceDaemon, ServiceInfo};
 use std::net::TcpListener;
 use thiserror::Error;
-use zero2prod::run;
+use zero2prod::startup::run;
 
 fn unregister(mdns: &ServiceDaemon, service_fullname: &str) -> Result<(), AppError> {
     match mdns.unregister(service_fullname) {
