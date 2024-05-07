@@ -2,6 +2,7 @@ use gethostname::gethostname;
 use mdns_sd::{Error, ServiceDaemon, ServiceInfo};
 use std::net::TcpListener;
 use thiserror::Error;
+use zero2prod::configuration::get_configuration;
 use zero2prod::startup::run;
 
 fn unregister(mdns: &ServiceDaemon, service_fullname: &str) -> Result<(), AppError> {
@@ -26,8 +27,12 @@ fn shutdown(mdns: ServiceDaemon) -> Result<(), AppError> {
 
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
-    let tcp_listener = TcpListener::bind("[::]:0").expect("Failed to bind random port");
-    let port = tcp_listener.local_addr().unwrap().port();
+    // Panic if we can't read configuration
+    let configuration = get_configuration().expect("Failed to read configuration.");
+    // We have removed the hard-coded '0' - it's now coming from our settings!
+    let port = configuration.application_port;
+    let address = format!("[::]:{}", port);
+    let tcp_listener = TcpListener::bind(address)?;
     let run_result = run(tcp_listener);
 
     let mdns = ServiceDaemon::new().expect("Failed to create daemon");
