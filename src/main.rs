@@ -1,7 +1,10 @@
+use std::net::TcpListener;
+
 use gethostname::gethostname;
 use mdns_sd::{Error, ServiceDaemon, ServiceInfo};
-use std::net::TcpListener;
+use sqlx::PgPool;
 use thiserror::Error;
+
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup::run;
 
@@ -27,13 +30,14 @@ fn shutdown(mdns: ServiceDaemon) -> Result<(), AppError> {
 
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
-    // Panic if we can't read configuration
     let configuration = get_configuration().expect("Failed to read configuration.");
-    // We have removed the hard-coded '0' - it's now coming from our settings!
+    let connection_pool = PgPool::connect(&configuration.database.connection_string())
+        .await
+        .expect("Failed to connect to Postgres.");
     let port = configuration.application_port;
     let address = format!("[::]:{}", port);
     let tcp_listener = TcpListener::bind(address)?;
-    let run_result = run(tcp_listener);
+    let run_result = run(tcp_listener, connection_pool);
 
     let mdns = ServiceDaemon::new().expect("Failed to create daemon");
     let service_type = "_my-test-service._tcp.local.";
