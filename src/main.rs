@@ -2,11 +2,12 @@ use std::net::TcpListener;
 
 use gethostname::gethostname;
 use mdns_sd::{Error, ServiceDaemon, ServiceInfo};
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use thiserror::Error;
-
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup::run;
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 fn unregister(mdns: &ServiceDaemon, service_fullname: &str) -> Result<(), AppError> {
     match mdns.unregister(service_fullname) {
@@ -30,10 +31,14 @@ fn shutdown(mdns: ServiceDaemon) -> Result<(), AppError> {
 
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
+    let subscriber = get_subscriber("zero2prod".into(), "info".into(), std::io::stdout);
+    init_subscriber(subscriber);
+
     let configuration = get_configuration().expect("Failed to read configuration.");
-    let connection_pool = PgPool::connect(&configuration.database.connection_string())
-        .await
-        .expect("Failed to connect to Postgres.");
+    let connection_pool =
+        PgPool::connect(configuration.database.connection_string().expose_secret())
+            .await
+            .expect("Failed to connect to Postgres.");
     let port = configuration.application_port;
     let address = format!("[::]:{}", port);
     let tcp_listener = TcpListener::bind(address)?;
